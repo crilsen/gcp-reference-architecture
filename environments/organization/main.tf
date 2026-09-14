@@ -1,7 +1,7 @@
 provider "google" { project = var.management_project_id }
 
 module "hierarchy" {
-  source = "../../modules/resource-hierarchy"
+  source                = "../../modules/resource-hierarchy"
   organization_id       = var.organization_id
   billing_account_id    = var.billing_account_id
   folder_name           = var.folder_name
