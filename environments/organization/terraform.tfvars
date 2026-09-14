@@ -1,0 +1,6 @@
+organization_id       = "replace-with-organization-id"
+billing_account_id    = "replace-with-billing-account-id"
+management_project_id = "replace-with-management-project-id"
+folder_name           = "Kubernetes Lab Workloads"
+lab_project_id        = "replace-with-unique-lab-project-id"
+production_project_id = "replace-with-unique-production-project-id"
