@@ -2,7 +2,7 @@
 
 ## Resume block (read first)
 
-- Repo state: branch `main`, HEAD `034b579`, working tree `clean` (`*:Zone.Identifier` files are ignored)
+- Repo state: branch `main`, HEAD `cf5271a` (context-adoption commits; run `git log -1` for the exact tip), working tree `clean` (`*:Zone.Identifier` files are ignored)
 - Source of truth: `AGENTS.md` → `.ai/`
 - Budget / usage observed: `unknown`
 - Checkpoint updated: `2026-10-15 18:10`
