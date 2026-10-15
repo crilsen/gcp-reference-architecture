@@ -2,14 +2,14 @@
 
 ## Resume block (read first)
 
-- Repo state: branch `main`, HEAD `4f85d84`, working tree `dirty: .ai/* (populated this session), untracked AGENTS.md and AGENTS.md:Zone.Identifier`
+- Repo state: branch `main`, HEAD `034b579`, working tree `clean` (`*:Zone.Identifier` files are ignored)
 - Source of truth: `AGENTS.md` → `.ai/`
 - Budget / usage observed: `unknown`
-- Checkpoint updated: `2026-10-15 18:05`
+- Checkpoint updated: `2026-10-15 18:10`
 - Last goal: Plug-and-play bootstrap — populate `.ai/` with observed facts for the GCP GKE reference architecture.
 - Annotation language: `English (standing preference for relay .md and new code comments; existing Portuguese messages in scripts/diagnose-gcp-auth.sh and scripts/install-gcloud-macos.sh are left as-is)`
 - Context update mode: `Automatic (keep .ai/ current as work happens; do not ask again)`
-- Exact next action: `If approved, commit the populated context (git add .ai AGENTS.md and commit). Then await a concrete task.`
+- Exact next action: `Await a concrete task. If asked, address LEARNINGS L-001 (README gcp/ paths) or L-002 (provider version drift).`
 - Blocked by: `None.`
 - Resume prompt: `Read AGENTS.md and .ai/HANDOFF.md. Continue from the Resume block. Do not rediscover context.`
 
@@ -53,6 +53,5 @@ Bootstrap complete. `.ai/` now describes the real project (GKE Standard on Compu
 
 ## Next Actions
 
-1. Optionally commit the populated context.
+1. Await a concrete task; update `.ai/` automatically as work proceeds.
 2. Address L-001/L-002 and the disclosure check when the user prioritizes them.
-3. Await a concrete task; update `.ai/` automatically as work proceeds.
