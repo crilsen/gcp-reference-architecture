@@ -23,3 +23,6 @@ terraform.rc
 *.p12
 *.pfx
 kubeconfig*
+
+# Windows metadata streams materialized as files
+*:Zone.Identifier
