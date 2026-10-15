@@ -2,7 +2,7 @@
 
 ## Resume block (read first)
 
-- Repo state: branch `main`, HEAD `f6fe608` plus uncommitted work from this session (see Files Changed); run `git log -1` for the exact tip after committing.
+- Repo state: branch `main`, HEAD `95a36c7` (edge implementation committed; working tree clean — run `git log -1` for the exact tip)
 - Source of truth: `AGENTS.md` → `.ai/`
 - Budget / usage observed: `unknown`
 - Checkpoint updated: `2026-10-15 18:55`
