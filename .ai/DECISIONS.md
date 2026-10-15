@@ -44,6 +44,9 @@ Consequences:
 | TDR-001 | TDR | Google Cloud, Terraform, and GCS remote state | Accepted | 2026-10-15 | inline |
 | ADR-001 | ADR | GKE Standard on Compute Engine (not Autopilot) | Accepted | 2026-10-15 | inline |
 | ADR-002 | ADR | Private VPC-native cluster with restricted endpoint and Cloud NAT egress | Accepted | 2026-10-15 | inline |
+| ADR-003 | ADR | Terraform-owned global external Application Load Balancer over a GKE standalone NEG | Accepted | 2026-10-15 | inline |
+| ADR-004 | ADR | Certificate Manager for TLS termination | Accepted | 2026-10-15 | inline |
+| ADR-005 | ADR | Cloud Armor on the external load balancer | Accepted | 2026-10-15 | inline |
 
 ## Records
 
@@ -105,5 +108,62 @@ Private nodes plus NAT remove public node IPs while preserving outbound access; 
 
 Consequences:
 Administrators must maintain the allowlist as their public IP changes. Evidence: `modules/gke/main.tf`, `modules/network/main.tf`, `environments/lab/variables.tf`.
+
+## ADR-003 — Terraform-owned global external Application Load Balancer over a GKE standalone NEG
+Type: ADR
+Status: Accepted
+Date: 2026-10-15
+Owners: repository maintainers
+Supersedes: none
+
+Context:
+The demo workload needs an L7 external load balancer with WAF and a managed certificate. GKE Ingress can create the load balancer, but it is opinionated and cannot attach Certificate Manager certificate maps.
+
+Decision:
+Own the global external Application Load Balancer in Terraform (`environments/lab/load-balancer.tf`): health check, backend service, URL map, target HTTP/HTTPS proxies, and forwarding rules (80 redirect and 443). The backend is the GKE **standalone NEG** created from the Service `cloud.google.com/neg` annotation with a fixed name; Terraform references the NEG self-link directly. The Kubernetes Ingress, BackendConfig, and ManagedCertificate were removed.
+
+Reasoning:
+Terraform ownership gives explicit control over every load-balancer object and is the only path that supports Certificate Manager certificate maps and Cloud Armor directly. A fixed NEG name keeps the reference deterministic.
+
+Consequences:
+Because the NEG exists only after the Service is applied, the lab applies in two phases (`enable_application_load_balancer = false`, deploy the app, then `true`). The NEG name in `kubernetes/hello-world/hello-world.yaml` must match `var.neg_name`. Evidence: `environments/lab/load-balancer.tf`.
+
+## ADR-004 — Certificate Manager for TLS termination
+Type: ADR
+Status: Accepted
+Date: 2026-10-15
+Owners: repository maintainers
+Supersedes: none
+
+Context:
+TLS must be provisioned and rotated without storing certificate material in the repository.
+
+Decision:
+Use Google Cloud Certificate Manager: a Google-managed certificate authorized through a DNS authorization, published in a certificate map, and attached to the global HTTPS target proxy (`environments/lab/cert.tf`).
+
+Reasoning:
+Certificate Manager is Google Cloud's managed certificate service, automates issuance and renewal, and avoids private-key handling. Certificate maps are supported by global external Application Load Balancers.
+
+Consequences:
+A DNS TXT/CNAME authorization record must exist before the certificate becomes active; the value is exposed as the `dns_authorization_record` output. DNS can be managed manually or by Cloud DNS when `manage_dns_records = true`. Evidence: `environments/lab/cert.tf`.
+
+## ADR-005 — Cloud Armor on the external load balancer
+Type: ADR
+Status: Accepted
+Date: 2026-10-15
+Owners: repository maintainers
+Supersedes: none
+
+Context:
+The public application needs edge protection against abuse and common web attacks.
+
+Decision:
+Attach a Cloud Armor security policy to the backend service: per-IP rate limiting with a temporary ban, and preconfigured SQLi/XSS WAF rules, on top of a default allow. Token-tunable thresholds live in `terraform.tfvars`.
+
+Reasoning:
+Cloud Armor is the native GCP L7 edge security control and integrates directly with the global external Application Load Balancer backend service.
+
+Consequences:
+Policy changes are Terraform-managed and reviewable; blocked requests return `403`/`429` and can be observed in Cloud Logging. Evidence: `environments/lab/load-balancer.tf`.
 
 Do not backfill invented history. Record decisions that are observed, expressly documented, or approved during future work.

@@ -18,3 +18,4 @@
 ## Completed
 
 - Plug-and-play bootstrap: populated `.ai/` (PROJECT, ARCHITECTURE, CONVENTIONS, VALIDATION, TOOLS, TASKS, HANDOFF) with observed facts, recorded decisions and learnings, and set automatic update mode with annotation language English.
+- Implemented the Terraform-owned global external Application Load Balancer over a GKE standalone NEG, with Cloud Armor and Certificate Manager TLS (`environments/lab/load-balancer.tf`, `cert.tf`); updated the Kubernetes manifest, READMEs, ADR-003/004/005, and conventions.

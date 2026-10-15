@@ -133,8 +133,10 @@ metadata:
   labels:
     app.kubernetes.io/name: hello-world
   annotations:
-    cloud.google.com/neg: '{"ingress": true}'
-    cloud.google.com/backend-config: '{"default": "hello-world"}'
+    # Expose port 80 as a standalone NEG named kubernetes-lab-hello-world.
+    # The name must match var.neg_name in environments/lab (custom NEG names
+    # must be unique within the region).
+    cloud.google.com/neg: '{"exposed_ports": {"80": {"name": "kubernetes-lab-hello-world"}}}'
 spec:
   type: ClusterIP
   selector:
@@ -144,54 +146,6 @@ spec:
       port: 80
       targetPort: http
       protocol: TCP
----
-apiVersion: cloud.google.com/v1
-kind: BackendConfig
-metadata:
-  name: hello-world
-  namespace: lab-workloads
-spec:
-  healthCheck:
-    type: HTTP
-    requestPath: /healthz
-    port: 8080
-    checkIntervalSec: 10
-    timeoutSec: 5
-    healthyThreshold: 1
-    unhealthyThreshold: 3
-  timeoutSec: 30
-  connectionDraining:
-    drainingTimeoutSec: 30
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: hello-world
-  namespace: lab-workloads
-  labels:
-    app.kubernetes.io/name: hello-world
-  annotations:
-    kubernetes.io/ingress.class: gce
-    kubernetes.io/ingress.global-static-ip-name: hello-world-ip
-    networking.gke.io/managed-certificates: hello-world-certificate
-spec:
-  rules:
-    - host: gcp-test.example.com
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: hello-world
-                port:
-                  name: http
----
-apiVersion: networking.gke.io/v1
-kind: ManagedCertificate
-metadata:
-  name: hello-world-certificate
-  namespace: lab-workloads
-spec:
-  domains:
-    - gcp-test.example.com
+# The global external Application Load Balancer, its health check, the Cloud
+# Armor policy, and the Certificate Manager certificate are provisioned by
+# Terraform in environments/lab, not by a Kubernetes Ingress.

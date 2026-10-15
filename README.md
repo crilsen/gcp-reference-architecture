@@ -25,6 +25,9 @@ Google-managed GKE control plane
 Artifact Registry
 Cloud Logging + Monitoring + Managed Service for Prometheus
 Workload Identity Federation for GKE
+
+Internet -> global static IP -> global external Application Load Balancer
+         (Cloud Armor + Certificate Manager) -> GKE standalone NEG -> Pod
 ```
 
 Terraform creates:
@@ -37,7 +40,12 @@ Terraform creates:
 - a separately managed, autoscaling Compute Engine node pool;
 - Dataplane V2, Cloud DNS, CSI drivers, managed Prometheus, Logging, and Monitoring;
 - a least-privilege node service account and Workload Identity;
-- a regional Docker Artifact Registry repository.
+- a regional Docker Artifact Registry repository;
+- a global external Application Load Balancer (backend service, URL map, HTTPS
+  and HTTP->HTTPS forwarding rules) in front of a GKE standalone NEG;
+- a Cloud Armor security policy (per-IP rate limiting and preconfigured WAF);
+- a Google-managed TLS certificate issued by Certificate Manager and wired to
+  the load balancer through a certificate map.
 
 GCP VPCs already install the local subnet route and default Internet route. GKE
 VPC-native uses alias IP routes for Pods and Services. Custom static routes are
@@ -90,9 +98,12 @@ For a new environment, replace `-migrate-state` with `-reconfigure`. See
 cd gcp/environments/lab
 terraform fmt -check -recursive
 terraform validate
-terraform plan -out=tfplan
-terraform apply tfplan
+# Phase 1: cluster and network only (the load balancer needs the app's NEG).
+terraform apply -var enable_application_load_balancer=false
 ```
+
+Then deploy the application and apply again with the load balancer enabled (see
+the next section and `kubernetes/hello-world/README.md`).
 
 Connect after apply:
 
@@ -106,6 +117,19 @@ kubectl get pods --all-namespaces
 
 If your public IP changes, update `master_authorized_networks` and apply again
 before using `kubectl`.
+
+## Load balancer, Cloud Armor, and TLS
+
+The global external Application Load Balancer, its Cloud Armor policy, and the
+Certificate Manager certificate are managed by `environments/lab` (files
+`load-balancer.tf` and `cert.tf`), not by a Kubernetes Ingress. The Service
+exposes a standalone NEG that Terraform references by name.
+
+Because the NEG exists only after the Service is applied, the lab applies in two
+phases: create the cluster with `enable_application_load_balancer = false`,
+deploy the application, then apply with the load balancer enabled. See
+`kubernetes/hello-world/README.md` for the exact sequence, the DNS records, and
+the Cloud Armor and certificate settings (`terraform.tfvars`).
 
 ## Trial cost controls
 

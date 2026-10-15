@@ -46,3 +46,47 @@ variable "node_min_count" { type = number }
 variable "node_max_count" { type = number }
 variable "node_spot" { type = bool }
 variable "deletion_protection" { type = bool }
+
+# --- Global external Application Load Balancer -----------------------------
+
+variable "enable_application_load_balancer" {
+  description = "Create the Terraform-owned global external Application Load Balancer (backend service, URL map, proxies, forwarding rules). Requires the hello-world Service (and its NEG) to exist in the cluster."
+  type        = bool
+}
+
+variable "enable_cloud_armor" {
+  description = "Attach a Cloud Armor security policy (rate limiting and preconfigured WAF rules) to the backend service."
+  type        = bool
+}
+
+variable "armor_rate_limit_count" {
+  description = "Requests per minute, per client IP, before Cloud Armor throttles and temporarily bans."
+  type        = number
+}
+
+variable "backend_max_rate_per_endpoint" {
+  description = "Maximum requests per second, per backend endpoint, used by the RATE balancing mode."
+  type        = number
+}
+
+variable "neg_name" {
+  description = "Name of the standalone NEG created by GKE from the hello-world Service annotation. Must match kubernetes/hello-world/hello-world.yaml."
+  type        = string
+}
+
+# --- TLS via Certificate Manager -------------------------------------------
+
+variable "domain_name" {
+  description = "FQDN served by the load balancer and used to issue the Google-managed certificate."
+  type        = string
+}
+
+variable "manage_dns_records" {
+  description = "Create the A and DNS-authorization records in a Cloud DNS managed zone. Set false to manage DNS in your own provider."
+  type        = bool
+}
+
+variable "dns_managed_zone_name" {
+  description = "Name of the existing Cloud DNS managed zone used when manage_dns_records is true."
+  type        = string
+}

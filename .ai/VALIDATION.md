@@ -18,6 +18,8 @@ As of the last context update, `terraform`, `tofu`, `tflint`, `shellcheck`, `hel
 3. `plan` only with credentials, an initialized backend, and permission; never `apply`/`destroy` without explicit authorization.
 4. `tflint` when configured.
 
+Note: `environments/lab` creates the load balancer against a GKE standalone NEG, so a full `plan`/`apply` succeeds only after the hello-world Service exists (two phases). Certificate issuance and Cloud Armor behavior are only observable at runtime, not offline.
+
 ## Kubernetes
 
 1. Validate YAML (for example `kubectl apply --dry-run=client -f kubernetes/hello-world/hello-world.yaml`) when a cluster context is available.

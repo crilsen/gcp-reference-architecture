@@ -1,75 +1,100 @@
-# Hello World with GKE Ingress
+# Hello World with a Terraform-managed global Application Load Balancer
 
-The application is published by the GKE Ingress controller through an external
-Google Cloud Application Load Balancer:
-
-```text
-Internet -> global static IP -> GKE Ingress -> NEG -> ClusterIP Service -> Pod
-```
-
-The `Service` remains `ClusterIP`. The Ingress creates the Load Balancer and the
-NEG annotation connects Pods directly to its backend, avoiding a second Load
-Balancer.
-
-## 1. Reserve the public IP
-
-Apply Terraform before the Kubernetes manifest:
-
-```bash
-cd gcp/environments/lab
-terraform plan
-terraform apply
-terraform output hello_world_public_ip
-cd ../../..
-```
-
-Create an `A` record with your DNS provider before deploying the Ingress:
+The application is published by a **global external Application Load Balancer**
+owned by Terraform (in `environments/lab`), with Cloud Armor and a
+Google-managed TLS certificate from Certificate Manager:
 
 ```text
-Name:  gcp-test
-Type:  A
-Value: <terraform output hello_world_public_ip>
-TTL:   300
+Internet -> global static IP -> HTTPS forwarding rule -> target HTTPS proxy
+         -> URL map -> backend service (Cloud Armor)
+         -> GKE standalone NEG -> ClusterIP Service -> Pod
 ```
 
-The final FQDN in this public example is `gcp-test.example.com`. The
-`example.com` domain is reserved for documentation and cannot be configured by
-users. Before deploying, replace it in `hello-world.yaml` with a hostname in a
-domain you control, then create the corresponding DNS record.
+The `Service` stays `ClusterIP` and exposes a standalone NEG through the
+`cloud.google.com/neg` annotation. Terraform references that NEG by name and
+creates every other load-balancer component.
 
-## 2. Deploy
+> The GKE Ingress API does not support Certificate Manager certificate maps, so
+> the load balancer is managed in Terraform instead of a Kubernetes Ingress.
+
+## Deploy order
+
+The standalone NEG exists only after the Service is applied to the cluster, and
+Terraform's backend service references the NEG. The lab therefore applies in two
+phases.
+
+### 1. Create the cluster first
+
+Keep the load balancer disabled for the first apply:
 
 ```bash
+cd environments/lab
+terraform init
+terraform apply -var enable_application_load_balancer=false
+```
+
+### 2. Deploy the application (this creates the NEG)
+
+```bash
+gcloud container clusters get-credentials kubernetes-lab \
+  --zone us-east1-b --project YOUR_PROJECT_ID
+
 kubectl apply -f kubernetes/hello-world/hello-world.yaml
 kubectl rollout status deployment/hello-world -n lab-workloads
-kubectl get pods,service,ingress,managedcertificate -n lab-workloads
 ```
 
-GKE can take 5 to 15 minutes to finish the global Load Balancer. Follow its
-progress with:
+Confirm the NEG was created (the name must be `kubernetes-lab-hello-world`):
 
 ```bash
-kubectl describe ingress hello-world -n lab-workloads
-kubectl get ingress hello-world -n lab-workloads --watch
-kubectl describe managedcertificate hello-world-certificate -n lab-workloads
+kubectl get service hello-world -n lab-workloads \
+  -o jsonpath='{.metadata.annotations.cloud\.google\.com/neg-status}'
+gcloud compute network-endpoint-groups list --filter='name~hello-world'
 ```
 
-When the Ingress has an address and the certificate status is `Active`, open:
+### 3. Create the load balancer
+
+```bash
+cd environments/lab
+terraform apply -var enable_application_load_balancer=true
+terraform output hello_world_public_ip
+terraform output dns_authorization_record
+```
+
+### 4. Configure DNS
+
+Point your domain at the static IP and satisfy the Certificate Manager DNS
+authorization. With `manage_dns_records = false`, create these records manually
+in your DNS provider:
+
+```text
+A     gcp-test.example.com        -> <terraform output hello_world_public_ip>
+CNAME <dns_authorization_record.name> -> <dns_authorization_record.data>
+```
+
+Replace `gcp-test.example.com` in `terraform.tfvars` (`domain_name`) with a domain
+you control. If the zone is in Cloud DNS, set `manage_dns_records = true` and
+`dns_managed_zone_name` so Terraform creates both records.
+
+The certificate stays `PROVISIONING` until the DNS authorization record resolves;
+provisioning can take up to a few hours.
+
+## Validate
 
 ```bash
 curl "https://gcp-test.example.com"
 curl "https://gcp-test.example.com/healthz"
+# HTTP redirects to HTTPS (301).
+curl -I "http://gcp-test.example.com"
 ```
 
 ## Remove
 
-Delete the Ingress before destroying Terraform so GKE can clean up all managed
-Load Balancer components:
+Delete the Kubernetes resources first, then destroy Terraform:
 
 ```bash
 kubectl delete -f kubernetes/hello-world/hello-world.yaml
-terraform -chdir=gcp/environments/lab destroy
+terraform -chdir=environments/lab destroy
 ```
 
-An external Application Load Balancer, health checks, forwarding rules, public
-IP, logging, and network traffic can generate charges against the trial credit.
+The load balancer, Cloud Armor policy, certificate, and static IP, plus logging
+and network egress, generate charges against the trial credit.

@@ -24,13 +24,13 @@ Google Cloud VPC (custom mode, regional routing)
 - **`modules/network`** — custom-mode VPC (`auto_create_subnetworks = false`, `routing_mode = REGIONAL`), a node subnet with `private_ip_google_access` and Pod/Service alias ranges, VPC Flow Logs, an optional regional Cloud Router + Public Cloud NAT (`enable_cloud_nat`), and firewall rules: internal cluster traffic, IAP SSH (`35.235.240.0/20`), node egress (`0.0.0.0/0`), and a priority-`65534` deny-by-default external ingress rule.
 - **`modules/gke`** — a dedicated least-privilege node service account and its project IAM bindings, a private zonal GKE Standard cluster, a separately managed autoscaling node pool, and a regional Docker Artifact Registry repository.
 - **`bootstrap/state`** — a GCS bucket for Terraform remote state (object versioning, 7-day soft delete, uniform bucket-level access, enforced public-access prevention, `prevent_destroy`). Its own state is intentionally local to avoid a circular backend dependency.
-- **`environments/lab`** — wires `network` + `gke`, enables the required project APIs, and creates a global static IP (`hello-world-ip`) for the Ingress. Uses the GCS backend with prefix `environments/lab`.
+- **`environments/lab`** — wires `network` + `gke`, enables the required project APIs (including Certificate Manager and Cloud DNS), and owns the edge: a global static IP (`hello-world-ip`), the global external Application Load Balancer (`load-balancer.tf`), and the TLS certificate via Certificate Manager (`cert.tf`). Uses the GCS backend with prefix `environments/lab`.
 - **`environments/organization`** — `modules/resource-hierarchy` (a Resource Manager folder plus lab/production projects, `auto_create_network = false`, `deletion_policy = PREVENT`) and `modules/org-policy` (folder-level policies disabling service-account key creation and upload). Requires an Organization and billing account.
-- **`kubernetes/hello-world`** — Namespace `lab-workloads`, ConfigMap, a hardened single-replica nginx Deployment, a `ClusterIP` Service with a NEG annotation, a `BackendConfig`, a GKE Ingress with a global static IP, and a `ManagedCertificate`. `kubernetes/base/namespace.yaml` holds the namespace alone.
+- **`kubernetes/hello-world`** — Namespace `lab-workloads`, ConfigMap, a hardened single-replica nginx Deployment, and a `ClusterIP` Service annotated with `cloud.google.com/neg` (standalone NEG `kubernetes-lab-hello-world`). There is no Kubernetes Ingress: the load balancer, Cloud Armor, and TLS are owned by Terraform. `kubernetes/base/namespace.yaml` holds the namespace alone.
 
 ## Traffic flow
 
-- **Ingress (workload):** Internet → global static IP → GKE Ingress → NEG → `ClusterIP` Service → Pod. The NEG connects Pods directly to the load-balancer backend, avoiding a second load balancer.
+- **Ingress (workload):** Internet → global static IP → HTTPS forwarding rule → target HTTPS proxy (Certificate Manager cert map) → URL map → backend service (Cloud Armor) → GKE standalone NEG → `ClusterIP` Service → Pod. The NEG connects Pods directly to the load-balancer backend; Terraform owns every component except the NEG, which the GKE NEG controller maintains.
 - **Cluster API:** administrator traffic reaches the public control-plane endpoint only from `master_authorized_networks` (a `/32` allowlist; `0.0.0.0/0` is rejected by variable validation).
 - **Egress:** nodes have no public IPs and reach the Internet through Cloud Router + Cloud NAT.
 
@@ -44,6 +44,7 @@ GCP VPCs install the local subnet route and default Internet route automatically
 - Workload Identity Federation for GKE (`<project>.svc.id.goog`) and `GKE_METADATA` workload metadata.
 - Private nodes with shielded nodes and secure boot; node image `COS_CONTAINERD`.
 - Organization policies at folder level disabling service-account key creation and upload.
+- Edge protection: a Cloud Armor security policy (per-IP rate limiting with temporary ban, and preconfigured SQLi/XSS WAF rules) attached to the global external Application Load Balancer, plus a modern TLS policy (`TLS_1_2` minimum) and a Google-managed certificate from Certificate Manager.
 - Public-safety CI scan rejects key/cert/state files, unexpected `.tfvars`, credential-like patterns, and nested Git repositories.
 
 ## State management

@@ -58,3 +58,23 @@ Context: Reviewing Terraform roots during bootstrap.
 Evidence: `environments/lab/versions.tf` and `bootstrap/state/versions.tf` pin `google ~> 8.0`; `environments/organization/versions.tf` pins `google ~> 7.0`.
 Pattern / rule: The three roots can resolve different provider major versions; keep them aligned to avoid behavioral drift and upgrade surprises.
 Promotion: none
+
+### L-003 — GKE Ingress cannot attach Certificate Manager certificate maps
+Date: 2026-10-15
+Status: promoted
+Confidence: observed
+Scope: **/*.tf, kubernetes/**
+Context: Choosing where to terminate TLS for the global load balancer.
+Evidence: GKE docs and community reports: the `ingress.gcp.kubernetes.io/pre-shared-cert` annotation accepts classic self-managed/Google-managed SSL certificates, not Certificate Manager certificate maps; certificate maps are supported by the Gateway API and by target proxies. External source: GKE "Secure traffic for GKE Ingress", kubernetes/ingress-gce issue 1692.
+Pattern / rule: To use Certificate Manager certificate maps, own the load balancer (Terraform) or use the GKE Gateway API; the classic Ingress API cannot.
+Promotion: CONVENTIONS.md (Load balancing, TLS, and edge security)
+
+### L-004 — Standalone NEG forces a two-phase Terraform apply
+Date: 2026-10-15
+Status: promoted
+Confidence: observed
+Scope: environments/lab/**
+Context: Wiring a Terraform-owned backend service to a GKE NEG.
+Evidence: GKE "Container-native load balancing through standalone zonal NEGs": the NEG is created by the NEG controller only after the Service exists, while the Terraform backend service references the NEG.
+Pattern / rule: Apply the cluster first, deploy the Service (creating the NEG), then apply the load balancer. A fixed NEG name (`cloud.google.com/neg` `name` field) makes the reference deterministic.
+Promotion: CONVENTIONS.md (Load balancing, TLS, and edge security)
